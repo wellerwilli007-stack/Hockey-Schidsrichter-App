@@ -1,0 +1,948 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Spielprotokoll</title>
+<style>
+  :root{
+    --turf-deep:#122E21;
+    --turf:#1E5C3E;
+    --turf-bright:#2C8257;
+    --line:#EFEDE3;
+    --ink:#15241B;
+    --ink-soft:#5B6A5F;
+    --whistle:#E3A93C;
+    --whistle-dark:#B9811E;
+    --home:#2C7850;
+    --away:#2D567E;
+    --danger:#C14F3D;
+    --card-bg:#FFFFFF;
+    --radius-lg:18px;
+    --radius-md:13px;
+    --shadow-sm:0 1px 3px rgba(18,32,24,.08);
+    --shadow-md:0 4px 14px rgba(18,32,24,.10);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --line:#101A14; --ink:#EDEFE6; --ink-soft:#9FAEA3; --card-bg:#1B2620; --turf-deep:#0B1D14;
+      --shadow-sm:0 1px 3px rgba(0,0,0,.3); --shadow-md:0 4px 14px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="dark"]{
+    --line:#101A14; --ink:#EDEFE6; --ink-soft:#9FAEA3; --card-bg:#1B2620; --turf-deep:#0B1D14;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-padding-top:env(safe-area-inset-top,0px);}
+  body{
+    margin:0; min-height:100%; background:var(--line); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    padding-top:env(safe-area-inset-top,0px);
+    padding-bottom:calc(28px + env(safe-area-inset-bottom,0px));
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:460px;margin:0 auto;padding:0 14px;}
+
+  .board{
+    background:
+      radial-gradient(130% 90% at 15% 0%, rgba(255,255,255,.08), transparent 55%),
+      linear-gradient(165deg,var(--turf-deep),var(--turf) 70%, var(--turf-bright));
+    color:#fff; padding:18px 18px 20px; padding-top:calc(22px + env(safe-area-inset-top,0px));
+    border-radius:0 0 26px 26px; position:relative; overflow:hidden; box-shadow:var(--shadow-md);
+  }
+  .board::after{
+    content:""; position:absolute; inset:0;
+    background:repeating-linear-gradient(90deg, rgba(255,255,255,.035) 0 40px, transparent 40px 80px);
+    pointer-events:none;
+  }
+  .names{display:flex; justify-content:space-between; gap:10px; margin-bottom:6px; position:relative;}
+  .names input{
+    background:transparent; border:none; border-bottom:1.5px solid rgba(255,255,255,.3);
+    color:#fff; font-size:15px; font-weight:800; width:45%; padding:3px 0 6px; text-align:center;
+    letter-spacing:.01em;
+  }
+  .names input:focus{outline:none; border-bottom-color:var(--whistle);}
+  .clubs{display:flex; justify-content:space-between; gap:10px; margin-bottom:12px; position:relative;}
+  .clubs input{
+    background:transparent; border:none; border-bottom:1px solid rgba(255,255,255,.16);
+    color:rgba(255,255,255,.7); font-size:11px; font-weight:500; width:45%; padding:2px 0; text-align:center;
+  }
+  .clubs input::placeholder{color:rgba(255,255,255,.38);}
+  .clubs input:focus{outline:none; border-bottom-color:var(--whistle);}
+  .scoreline{display:flex; align-items:center; justify-content:center; gap:26px; margin:8px 0 14px;}
+  .score-col{display:flex; flex-direction:column; align-items:center; gap:3px;}
+  .score{font-size:52px; font-weight:800; line-height:1; min-width:54px; text-align:center; letter-spacing:-.02em;}
+  .players-on-field{font-size:11px; color:rgba(255,255,255,.58); font-weight:700; letter-spacing:.01em;}
+  .dash{font-size:26px; opacity:.4; font-weight:700; align-self:flex-start; margin-top:12px;}
+
+  .phase{
+    text-align:center; font-size:12px; font-weight:800; letter-spacing:.06em;
+    color:var(--turf-deep); text-transform:uppercase; margin:0 auto 4px; padding:4px 14px;
+    background:var(--whistle); border-radius:20px; display:table;
+  }
+  .phase-target{text-align:center; font-size:11px; color:rgba(255,255,255,.5); margin-bottom:10px;}
+  .clock{
+    font-size:46px; font-weight:800; letter-spacing:.5px; text-align:center;
+    font-variant-numeric:tabular-nums; margin-bottom:14px; text-shadow:0 2px 10px rgba(0,0,0,.2);
+  }
+  .clock-controls{display:flex; gap:8px; justify-content:center; flex-wrap:wrap;}
+  .clk-btn{
+    border:none; border-radius:var(--radius-md); padding:11px 16px; font-size:13px; font-weight:800;
+    cursor:pointer; -webkit-tap-highlight-color:transparent; transition:transform .08s, filter .15s;
+  }
+  .clk-btn:active{transform:scale(.96);}
+  .clk-btn.start{background:var(--whistle); color:var(--turf-deep); box-shadow:0 3px 10px rgba(227,169,60,.35);}
+  .clk-btn.stop{background:#fff; color:var(--turf-deep); box-shadow:0 3px 10px rgba(0,0,0,.15);}
+  .clk-btn.reset{background:rgba(255,255,255,.14); color:#fff;}
+  .clk-btn.next{background:rgba(255,255,255,.14); color:#fff;}
+
+  .goal-zones{display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:18px;}
+  .zone{
+    border:none; border-radius:var(--radius-lg); padding:24px 10px; color:#fff; font-weight:800;
+    font-size:15px; cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:6px;
+    box-shadow:var(--shadow-sm); transition:transform .08s, filter .15s;
+  }
+  .zone.home{background:linear-gradient(155deg,var(--home),#1F5C3C);}
+  .zone.away{background:linear-gradient(155deg,var(--away),#1F3F5C);}
+  .zone .plus{font-size:28px; line-height:1; font-weight:300;}
+  .zone:active{transform:scale(.97); filter:brightness(.94);}
+
+  .overlay{
+    position:fixed; inset:0; background:rgba(13,20,16,.55); display:flex; align-items:flex-end;
+    justify-content:center; z-index:20; backdrop-filter:blur(2px);
+  }
+  .overlay.hidden{display:none;}
+  .sheet{
+    background:var(--card-bg); width:100%; max-width:460px; border-radius:24px 24px 0 0;
+    padding:14px 20px calc(22px + env(safe-area-inset-bottom,0px)); box-shadow:0 -8px 30px rgba(0,0,0,.2);
+    position:relative;
+  }
+  .sheet::before{
+    content:""; display:block; width:36px; height:4px; border-radius:4px;
+    background:var(--line); margin:0 auto 14px;
+  }
+  .sheet h4{margin:0 0 4px; font-size:16px; font-weight:800;}
+  .sheet .sub{font-size:12px; color:var(--ink-soft); margin-bottom:14px;}
+  .sheet input{
+    width:100%; font-size:28px; font-weight:800; text-align:center; padding:14px; border-radius:var(--radius-md);
+    border:1.5px solid var(--line); margin-bottom:14px; color:var(--ink); background:var(--card-bg);
+  }
+  .sheet input:focus{outline:none; border-color:var(--turf-bright);}
+  .sheet-actions{display:flex; gap:10px;}
+  .sheet-actions.three{flex-direction:column;}
+  .sheet-actions button{
+    flex:1; border:none; border-radius:var(--radius-md); padding:14px; font-size:15px; font-weight:800; cursor:pointer;
+    transition:transform .08s;
+  }
+  .sheet-actions button:active{transform:scale(.97);}
+  .sheet-actions .confirm{background:var(--turf); color:#fff; box-shadow:var(--shadow-sm);}
+  .sheet-actions .cancel{background:var(--line); color:var(--ink);}
+
+  .card-section{
+    margin-top:14px; background:var(--card-bg); border-radius:var(--radius-lg);
+    padding:14px 14px 16px; box-shadow:var(--shadow-sm);
+  }
+  .card-section h3{
+    font-size:12px; text-transform:uppercase; letter-spacing:.07em; color:var(--ink-soft);
+    margin:0 0 10px; font-weight:800; padding-left:10px; border-left:3px solid var(--whistle);
+  }
+  .card-zones{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+  .card-col{display:flex; flex-direction:column; gap:8px;}
+  .card-btn{
+    display:flex; align-items:center; justify-content:center; gap:8px;
+    border:1.5px solid var(--line); background:var(--card-bg); color:var(--ink);
+    border-radius:var(--radius-md); padding:11px; font-size:13px; font-weight:800; cursor:pointer;
+    transition:transform .08s, border-color .15s;
+  }
+  .card-btn:active{transform:scale(.97); border-color:var(--turf-bright);}
+  .card-ico{width:12px; height:17px; border-radius:2px; background:#E6C140; flex-shrink:0; box-shadow:0 0 0 1px rgba(0,0,0,.08) inset;}
+  .card-ico.green{background:#3FA34D;}
+  .card-ico.red{background:var(--danger);}
+  .card-timer-dot{width:9px; height:13px; border-radius:2px; flex-shrink:0;}
+  .card-timer-dot.green{background:#3FA34D;}
+  .card-timer-dot.yellow{background:#E6C140;}
+  .card-timer-dot.red{background:var(--danger);}
+
+  .card-summary{
+    display:flex; justify-content:space-between; gap:10px; margin-top:12px; padding-top:12px;
+    border-top:1px solid var(--line); font-size:12px; color:var(--ink-soft);
+  }
+  .card-summary div{flex:1; text-align:center;}
+  .card-summary strong{color:var(--ink); font-weight:800;}
+
+  .active-cards{margin-top:10px;}
+  .card-timer-row{
+    display:flex; align-items:center; gap:10px; background:var(--line);
+    border-radius:var(--radius-md); padding:10px 12px; margin-bottom:6px;
+  }
+  .card-timer-row.expired{box-shadow:0 0 0 1.5px var(--danger) inset; background:rgba(193,79,61,.08);}
+  .card-timer-time{font-weight:800; font-variant-numeric:tabular-nums; width:60px; font-size:14px;}
+  .card-timer-time.expired{color:var(--danger);}
+  .card-timer-text{flex:1; font-size:13px; font-weight:600;}
+  .card-timer-remove{border:none; background:none; color:var(--danger); font-size:12px; font-weight:700; cursor:pointer; padding:4px 6px;}
+
+  .duration-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:14px;}
+  .duration-grid button{
+    border:1.5px solid var(--turf); background:transparent; color:var(--ink);
+    border-radius:var(--radius-md); padding:14px 0; font-size:17px; font-weight:800; cursor:pointer;
+    transition:transform .08s, background .15s;
+  }
+  .duration-grid button:active{transform:scale(.95); background:var(--line);}
+
+  .log{margin-top:14px; background:var(--card-bg); border-radius:var(--radius-lg); padding:14px 14px 10px; box-shadow:var(--shadow-sm);}
+  .log h3{
+    font-size:12px; text-transform:uppercase; letter-spacing:.07em; color:var(--ink-soft);
+    margin:0 0 10px; font-weight:800; padding-left:10px; border-left:3px solid var(--turf-bright);
+  }
+  .goal-row{
+    display:flex; align-items:center; gap:10px; background:var(--line);
+    border-radius:var(--radius-md); padding:10px 12px; margin-bottom:6px;
+  }
+  .goal-min{
+    font-weight:800; font-variant-numeric:tabular-nums; width:50px; color:var(--ink-soft); font-size:12px;
+    border:none; background:none; text-align:left; padding:0; cursor:pointer; border-bottom:1px dotted transparent;
+  }
+  .goal-min.editable{border-bottom-color:var(--ink-soft);}
+  .goal-dot{width:9px; height:9px; border-radius:50%; flex-shrink:0;}
+  .goal-dot.home{background:var(--home);}
+  .goal-dot.away{background:var(--away);}
+  .goal-text{flex:1; font-size:13.5px; font-weight:600;}
+  .goal-remove{border:none; background:none; color:var(--danger); font-size:12px; font-weight:700; cursor:pointer; padding:4px 6px;}
+  .log-empty{font-size:13px; color:var(--ink-soft); padding:8px 2px;}
+
+  .reset-match{
+    display:block; width:100%; margin:14px 0 0; background:var(--card-bg); border:none;
+    color:var(--danger); font-size:13px; font-weight:800; cursor:pointer; padding:13px;
+    border-radius:var(--radius-md); box-shadow:var(--shadow-sm);
+  }
+  .reset-match:active{transform:scale(.98);}
+  .sheet-actions .danger{background:var(--danger); color:#fff;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="board">
+    <div class="names">
+      <input id="homeName" value="Heim" maxlength="16">
+      <input id="awayName" value="Gast" maxlength="16">
+    </div>
+    <div class="clubs">
+      <input id="homeClub" placeholder="Hockeyclub" maxlength="30">
+      <input id="awayClub" placeholder="Hockeyclub" maxlength="30">
+    </div>
+    <div class="scoreline">
+      <div class="score-col">
+        <div class="score" id="homeScore">0</div>
+        <div class="players-on-field" id="homePlayers">11 auf dem Feld</div>
+      </div>
+      <div class="dash">:</div>
+      <div class="score-col">
+        <div class="score" id="awayScore">0</div>
+        <div class="players-on-field" id="awayPlayers">11 auf dem Feld</div>
+      </div>
+    </div>
+    <div class="phase" id="phaseName">1. Viertel</div>
+    <div class="phase-target" id="phaseTarget">Ziel: 15:00</div>
+    <div class="clock" id="clock">00:00</div>
+    <div class="clock-controls">
+      <button class="clk-btn start" id="toggleClock">Start</button>
+      <button class="clk-btn reset" id="resetClock">0:00</button>
+      <button class="clk-btn next" id="nextPhase">Nächste Phase →</button>
+    </div>
+  </div>
+
+  <div class="goal-zones">
+    <button class="zone home" id="homeZone">
+      <span class="plus">+</span>
+      <span id="homeZoneLabel">Tor Heim</span>
+    </button>
+    <button class="zone away" id="awayZone">
+      <span class="plus">+</span>
+      <span id="awayZoneLabel">Tor Gast</span>
+    </button>
+  </div>
+
+  <div class="card-section">
+    <h3>Karten</h3>
+    <div class="card-zones">
+      <div class="card-col">
+        <button class="card-btn" id="homeCardFixed"><span class="card-ico green"></span>Grün · 2 Min.</button>
+        <button class="card-btn" id="homeCardVar"><span class="card-ico"></span>Gelb · 5–10 Min.</button>
+        <button class="card-btn" id="homeCardRed"><span class="card-ico red"></span>Rote Karte</button>
+      </div>
+      <div class="card-col">
+        <button class="card-btn" id="awayCardFixed"><span class="card-ico green"></span>Grün · 2 Min.</button>
+        <button class="card-btn" id="awayCardVar"><span class="card-ico"></span>Gelb · 5–10 Min.</button>
+        <button class="card-btn" id="awayCardRed"><span class="card-ico red"></span>Rote Karte</button>
+      </div>
+    </div>
+    <div class="card-summary" id="cardSummary"></div>
+    <div class="active-cards" id="activeCards"></div>
+  </div>
+
+  <div class="card-section">
+    <h3>Kurze Ecke</h3>
+    <div class="card-zones">
+      <button class="card-btn" id="homeCorner">Kurze Ecke · Heim</button>
+      <button class="card-btn" id="awayCorner">Kurze Ecke · Gast</button>
+    </div>
+  </div>
+
+  <div class="card-section">
+    <h3>7 Meter</h3>
+    <div class="card-zones">
+      <button class="card-btn" id="home7m">7 Meter · Heim</button>
+      <button class="card-btn" id="away7m">7 Meter · Gast</button>
+    </div>
+  </div>
+
+  <div class="card-section">
+    <h3>Timeout</h3>
+    <div class="card-zones">
+      <button class="card-btn" id="homeTimeout">Timeout · Heim</button>
+      <button class="card-btn" id="awayTimeout">Timeout · Gast</button>
+    </div>
+  </div>
+
+  <div class="log">
+    <h3>Spielbogen</h3>
+    <div id="eventList"></div>
+  </div>
+
+  <button class="reset-match" id="endMatch" style="color:var(--turf)">Spiel beenden (Abpfiff)</button>
+  <button class="reset-match" id="resetMatch">Neues Spiel (alles löschen)</button>
+</div>
+
+<div class="overlay hidden" id="overlay">
+  <div class="sheet">
+    <h4 id="sheetTitle">Tor für Heim</h4>
+    <div class="sub" id="sheetSub"></div>
+    <input id="numInput" inputmode="numeric" placeholder="Rückennummer" autocomplete="off">
+    <div class="sheet-actions">
+      <button class="cancel" id="sheetCancel">Abbrechen</button>
+      <button class="confirm" id="sheetConfirm">Tor eintragen</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay hidden" id="minuteOverlay">
+  <div class="sheet">
+    <h4>Minute korrigieren</h4>
+    <div class="sub" id="minuteSub"></div>
+    <input id="minuteInput" inputmode="numeric" placeholder="Minute" autocomplete="off">
+    <div class="sheet-actions">
+      <button class="cancel" id="minuteCancel">Abbrechen</button>
+      <button class="confirm" id="minuteConfirm">Speichern</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay hidden" id="cardOverlay">
+  <div class="sheet">
+    <h4 id="cardSheetTitle">Gelbe Karte für Heim</h4>
+    <div class="sub">Dauer wählen</div>
+    <div class="duration-grid" id="durationGrid"></div>
+    <div class="sheet-actions">
+      <button class="cancel" id="cardSheetCancel">Abbrechen</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay hidden" id="confirmOverlay">
+  <div class="sheet">
+    <h4>Alles löschen?</h4>
+    <div class="sub">Spielstand, Zeit, Phase und der gesamte Spielbogen werden gelöscht. Das lässt sich nicht rückgängig machen.</div>
+    <div class="sheet-actions">
+      <button class="cancel" id="confirmCancel">Abbrechen</button>
+      <button class="danger" id="confirmOk">Ja, alles löschen</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var KEY = "hockey_match_state_v2";
+
+  var PHASES = [
+    {label:"1. Viertel", minutes:15, isBreak:false},
+    {label:"Pause", minutes:2, isBreak:true},
+    {label:"2. Viertel", minutes:15, isBreak:false},
+    {label:"Halbzeitpause", minutes:10, isBreak:true},
+    {label:"3. Viertel", minutes:15, isBreak:false},
+    {label:"Pause", minutes:2, isBreak:true},
+    {label:"4. Viertel", minutes:15, isBreak:false}
+  ];
+
+  var state = {
+    homeName:"Heim", awayName:"Gast",
+    homeClub:"", awayClub:"",
+    events:[],
+    seq:0,
+    started:false,
+    cards:[],
+    running:false, elapsedMs:0, startedAt:null,
+    phaseIndex:0
+  };
+
+  function load(){
+    try{
+      var raw = localStorage.getItem(KEY);
+      if(raw) state = Object.assign(state, JSON.parse(raw));
+    }catch(e){ console.warn("Laden fehlgeschlagen", e); }
+  }
+  function save(){
+    try{ localStorage.setItem(KEY, JSON.stringify(state)); }
+    catch(e){ console.warn("Speichern fehlgeschlagen", e); }
+  }
+
+  function currentElapsedMs(){
+    if(state.running && state.startedAt) return state.elapsedMs + (Date.now() - state.startedAt);
+    return state.elapsedMs;
+  }
+  function fmt(ms){
+    var totalSec = Math.floor(ms/1000);
+    var m = Math.floor(totalSec/60), s = totalSec%60;
+    return (m<10?"0":"")+m+":"+(s<10?"0":"")+s;
+  }
+  function currentPhase(){ return PHASES[state.phaseIndex]; }
+  function matchMinute(){ return Math.floor(currentElapsedMs()/60000) + 1; }
+  function currentLabel(){
+    return currentPhase().label + ", " + matchMinute() + "'";
+  }
+  function nextId(){ return "e" + Date.now() + Math.floor(Math.random()*1000); }
+
+  // Sound alarm for expired cards
+  var audioCtx = null;
+  function unlockAudio(){
+    if(!audioCtx){
+      try{ audioCtx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){}
+    }
+    if(audioCtx && audioCtx.state === "suspended"){ try{ audioCtx.resume(); }catch(e){} }
+  }
+  function beep(freq, startTime, duration){
+    var osc = audioCtx.createOscillator();
+    var gain = audioCtx.createGain();
+    osc.frequency.value = freq;
+    osc.type = "sine";
+    gain.gain.setValueAtTime(0.0001, startTime);
+    gain.gain.exponentialRampToValueAtTime(0.35, startTime+0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, startTime+duration);
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.start(startTime); osc.stop(startTime+duration+0.02);
+  }
+  function playAlarm(){
+    if(!audioCtx) return;
+    try{
+      var now = audioCtx.currentTime;
+      beep(880, now, 0.15);
+      beep(880, now+0.22, 0.15);
+      beep(880, now+0.44, 0.3);
+    }catch(e){}
+  }
+
+  var clockEl = document.getElementById("clock");
+  var phaseNameEl = document.getElementById("phaseName");
+  var phaseTargetEl = document.getElementById("phaseTarget");
+  var resetClockBtn = document.getElementById("resetClock");
+
+  function renderClock(){
+    var p = currentPhase();
+    var totalMs = p.minutes * 60000;
+    var remaining = totalMs - currentElapsedMs();
+    if(remaining >= 0){
+      clockEl.textContent = fmt(remaining);
+      clockEl.style.color = "";
+    } else {
+      clockEl.textContent = "+" + fmt(-remaining);
+      clockEl.style.color = "var(--whistle)";
+    }
+  }
+  function renderPhase(){
+    var p = currentPhase();
+    phaseNameEl.textContent = p.label;
+    phaseTargetEl.textContent = "Dauer: " + (p.minutes<10?"0":"")+p.minutes + ":00";
+  }
+
+  var tickHandle = null;
+  function ensureTicking(){
+    if(state.running && !tickHandle) tickHandle = setInterval(renderClock, 500);
+    else if(!state.running && tickHandle){ clearInterval(tickHandle); tickHandle = null; }
+  }
+
+  var toggleBtn = document.getElementById("toggleClock");
+  function renderToggle(){
+    toggleBtn.textContent = state.running ? "Stopp" : "Start";
+    toggleBtn.className = "clk-btn " + (state.running ? "stop" : "start");
+  }
+
+  toggleBtn.addEventListener("click", function(){
+    if(state.running){
+      state.elapsedMs = currentElapsedMs(); state.running = false; state.startedAt = null;
+      renderToggle(); ensureTicking(); renderClock(); save();
+    } else {
+      var isMatchStart = !state.started;
+      state.running = true; state.startedAt = Date.now();
+      if(isMatchStart){
+        state.started = true;
+        addEvent({ type:"milestone", label:"Spielbeginn", minute:1, phaseLabel: currentPhase().label });
+      }
+      renderToggle(); ensureTicking(); renderClock(); save();
+    }
+  });
+
+  resetClockBtn.addEventListener("click", function(){
+    state.running = false; state.startedAt = null; state.elapsedMs = 0;
+    renderToggle(); ensureTicking(); renderClock(); save();
+  });
+
+  document.getElementById("nextPhase").addEventListener("click", function(){
+    var endedPhase = currentPhase();
+    var endedMinute = matchMinute();
+    if(state.phaseIndex < PHASES.length - 1){
+      state.phaseIndex += 1;
+    } else {
+      state.phaseIndex = 0;
+    }
+    state.running = false; state.startedAt = null; state.elapsedMs = 0;
+    if(!endedPhase.isBreak){
+      addEvent({ type:"milestone", label: endedPhase.label + " zu Ende", minute: endedMinute, phaseLabel: endedPhase.label });
+    }
+    renderPhase(); renderToggle(); ensureTicking(); renderClock(); save();
+  });
+
+  // Names
+  var homeNameInput = document.getElementById("homeName");
+  var awayNameInput = document.getElementById("awayName");
+  var homeZoneLabel = document.getElementById("homeZoneLabel");
+  var awayZoneLabel = document.getElementById("awayZoneLabel");
+  homeNameInput.addEventListener("input", function(){
+    state.homeName = homeNameInput.value || "Heim";
+    homeZoneLabel.textContent = "Tor " + state.homeName;
+    renderEvents(); save();
+  });
+  awayNameInput.addEventListener("input", function(){
+    state.awayName = awayNameInput.value || "Gast";
+    awayZoneLabel.textContent = "Tor " + state.awayName;
+    renderEvents(); save();
+  });
+
+  var homeClubInput = document.getElementById("homeClub");
+  var awayClubInput = document.getElementById("awayClub");
+  homeClubInput.addEventListener("input", function(){
+    state.homeClub = homeClubInput.value;
+    save();
+  });
+  awayClubInput.addEventListener("input", function(){
+    state.awayClub = awayClubInput.value;
+    save();
+  });
+
+  // Goal entry sheet
+  var overlay = document.getElementById("overlay");
+  var sheetTitle = document.getElementById("sheetTitle");
+  var sheetSub = document.getElementById("sheetSub");
+  var numInput = document.getElementById("numInput");
+  var pendingTeam = null;
+  var pendingGoalSource = null;
+  var pendingEditId = null;
+
+  function openSheet(team, source, editEventId){
+    pendingTeam = team;
+    pendingGoalSource = source || null;
+    pendingEditId = editEventId || null;
+    var name = team === "home" ? state.homeName : state.awayName;
+    var titlePrefix = source === "corner" ? "Kurzecken-Tor für " : (source === "penalty7m" ? "7-Meter-Tor für " : "Tor für ");
+    sheetTitle.textContent = titlePrefix + name;
+    sheetSub.textContent = currentLabel();
+    numInput.value = "";
+    overlay.classList.remove("hidden");
+    setTimeout(function(){ numInput.focus(); }, 50);
+  }
+  function closeSheet(){
+    overlay.classList.add("hidden");
+    pendingTeam = null;
+    pendingGoalSource = null;
+    pendingEditId = null;
+  }
+  document.getElementById("homeZone").addEventListener("click", function(){ openSheet("home"); });
+  document.getElementById("awayZone").addEventListener("click", function(){ openSheet("away"); });
+  document.getElementById("sheetCancel").addEventListener("click", closeSheet);
+  overlay.addEventListener("click", function(e){ if(e.target === overlay) closeSheet(); });
+
+  function addEvent(entry){
+    entry.id = nextId();
+    entry.seq = state.seq++;
+    state.events.push(entry);
+    save(); renderEvents();
+  }
+  function removeEvent(id){
+    state.events = state.events.filter(function(e){ return e.id !== id; });
+    save(); renderEvents();
+  }
+  function markEventDecided(id){
+    var ev = state.events.filter(function(e){ return e.id === id; })[0];
+    if(ev){ ev.decided = true; save(); renderEvents(); }
+  }
+
+  function confirmGoal(){
+    if(!pendingTeam) return;
+    var num = numInput.value.trim();
+    if(pendingEditId){
+      var existing = state.events.filter(function(e){ return e.id === pendingEditId; })[0];
+      if(existing){
+        existing.type = "goal";
+        existing.num = num || "?";
+        existing.source = pendingGoalSource;
+        save(); renderEvents();
+      }
+      closeSheet();
+      return;
+    }
+    var entry = {
+      type: "goal",
+      team: pendingTeam,
+      num: num || "?",
+      minute: matchMinute(),
+      phaseLabel: currentPhase().label
+    };
+    if(pendingGoalSource) entry.source = pendingGoalSource;
+    addEvent(entry);
+    closeSheet();
+  }
+  document.getElementById("sheetConfirm").addEventListener("click", confirmGoal);
+  numInput.addEventListener("keydown", function(e){ if(e.key === "Enter") confirmGoal(); });
+
+  var eventListEl = document.getElementById("eventList");
+  var homeScoreEl = document.getElementById("homeScore");
+  var awayScoreEl = document.getElementById("awayScore");
+
+  function eventText(e){
+    if(e.type === "milestone") return e.label;
+    var teamName = e.team === "home" ? state.homeName : state.awayName;
+    if(e.type === "goal"){
+      var prefix = null;
+      if(e.source === "corner") prefix = "Kurzecken-Tor";
+      else if(e.source === "penalty7m") prefix = "7-Meter-Tor";
+      return (prefix ? prefix + " — " : "") + teamName + " — #" + e.num;
+    }
+    if(e.type === "card"){
+      var label = e.cardType === "red" ? "Rote Karte" : (e.cardType === "green" ? "Grüne Karte" : "Gelbe Karte");
+      return label + (e.duration ? " " + e.duration + "'" : "") + " — " + teamName;
+    }
+    if(e.type === "timeout") return "Timeout — " + teamName;
+    if(e.type === "corner") return "Kurze Ecke — " + teamName + (e.decided ? " · kein Tor" : "");
+    if(e.type === "penalty7m") return "7-Meter — " + teamName + (e.decided ? " · kein Tor" : "");
+    return teamName;
+  }
+
+  function renderEvents(){
+    eventListEl.innerHTML = "";
+    var homeCount = 0, awayCount = 0;
+    var sorted = state.events.slice().sort(function(a,b){ return a.seq - b.seq; });
+    if(sorted.length === 0){
+      var e = document.createElement("div");
+      e.className = "log-empty";
+      e.textContent = "Noch keine Einträge im Spielbogen.";
+      eventListEl.appendChild(e);
+    } else {
+      sorted.forEach(function(ev){
+        if(ev.type === "goal"){ if(ev.team === "home") homeCount++; else awayCount++; }
+        var row = document.createElement("div");
+        row.className = "goal-row";
+        var dotHtml = ev.type === "milestone"
+          ? '<div class="goal-dot" style="background:var(--whistle-dark,var(--whistle))"></div>'
+          : '<div class="goal-dot ' + ev.team + '"></div>';
+        var isMilestone = ev.type === "milestone";
+        var minHtml = isMilestone ? "" : ev.minute + "' " + (ev.phaseLabel||"");
+        row.innerHTML =
+          '<button class="goal-min' + (isMilestone ? "" : " editable") + '">' + minHtml + '</button>' +
+          dotHtml +
+          '<div class="goal-text">' + eventText(ev) + '</div>';
+        if(!isMilestone){
+          row.querySelector(".goal-min").addEventListener("click", function(){ openMinuteOverlay(ev.id); });
+        }
+        if((ev.type === "corner" || ev.type === "penalty7m") && !ev.decided){
+          var markGoal = document.createElement("button");
+          markGoal.className = "goal-remove";
+          markGoal.style.color = "var(--turf)";
+          markGoal.textContent = "Tor";
+          markGoal.addEventListener("click", function(){ openSheet(ev.team, ev.type, ev.id); });
+          row.appendChild(markGoal);
+
+          var markNoGoal = document.createElement("button");
+          markNoGoal.className = "goal-remove";
+          markNoGoal.style.color = "var(--ink-soft)";
+          markNoGoal.textContent = "Kein Tor";
+          markNoGoal.addEventListener("click", function(){ markEventDecided(ev.id); });
+          row.appendChild(markNoGoal);
+        }
+        var rm = document.createElement("button");
+        rm.className = "goal-remove";
+        rm.textContent = "Entfernen";
+        rm.addEventListener("click", function(){ removeEvent(ev.id); });
+        row.appendChild(rm);
+        eventListEl.appendChild(row);
+      });
+    }
+    homeScoreEl.textContent = homeCount;
+    awayScoreEl.textContent = awayCount;
+    renderCardSummary();
+    renderPlayersOnField();
+  }
+
+  var homePlayersEl = document.getElementById("homePlayers");
+  var awayPlayersEl = document.getElementById("awayPlayers");
+  var SQUAD_SIZE = 11;
+  function playersOnField(team){
+    var activeSuspensions = state.cards.filter(function(c){
+      if(c.team !== team) return false;
+      var remaining = c.minutes*60000 - (Date.now() - c.startedAt);
+      return remaining > 0;
+    }).length;
+    var redCount = state.events.filter(function(e){
+      return e.type === "card" && e.team === team && e.cardType === "red";
+    }).length;
+    var onField = SQUAD_SIZE - activeSuspensions - redCount;
+    return onField < 0 ? 0 : onField;
+  }
+  function renderPlayersOnField(){
+    homePlayersEl.textContent = playersOnField("home") + " auf dem Feld";
+    awayPlayersEl.textContent = playersOnField("away") + " auf dem Feld";
+  }
+
+  var cardSummaryEl = document.getElementById("cardSummary");
+  function renderCardSummary(){
+    var counts = {
+      home:{green:0,yellow:0,red:0},
+      away:{green:0,yellow:0,red:0}
+    };
+    state.events.forEach(function(ev){
+      if(ev.type === "card" && counts[ev.team]){
+        counts[ev.team][ev.cardType] = (counts[ev.team][ev.cardType]||0) + 1;
+      }
+    });
+    function line(team){
+      var c = counts[team];
+      return "<strong>" + c.green + "</strong> Grün · <strong>" + c.yellow + "</strong> Gelb · <strong>" + c.red + "</strong> Rot";
+    }
+    cardSummaryEl.innerHTML =
+      "<div>" + state.homeName + "<br>" + line("home") + "</div>" +
+      "<div>" + state.awayName + "<br>" + line("away") + "</div>";
+  }
+
+  // Card timers (independent of match clock)
+  var activeCardsEl = document.getElementById("activeCards");
+  var cardOverlay = document.getElementById("cardOverlay");
+  var cardSheetTitle = document.getElementById("cardSheetTitle");
+  var durationGrid = document.getElementById("durationGrid");
+  var pendingCardTeam = null;
+  var notifiedCards = {};
+  var cardTickHandle = null;
+
+  function nextCardId(){ return "c" + Date.now() + Math.floor(Math.random()*1000); }
+
+  function addCard(team, minutes, type){
+    state.cards.push({ id: nextCardId(), team: team, minutes: minutes, type: type, startedAt: Date.now() });
+    addEvent({
+      type: "card",
+      team: team,
+      cardType: type,
+      duration: minutes,
+      minute: matchMinute(),
+      phaseLabel: currentPhase().label
+    });
+    save(); renderCards(); ensureCardTicking();
+  }
+  function removeCard(id){
+    state.cards = state.cards.filter(function(c){ return c.id !== id; });
+    delete notifiedCards[id];
+    save(); renderCards(); ensureCardTicking();
+  }
+
+  function renderCards(){
+    activeCardsEl.innerHTML = "";
+    state.cards.forEach(function(c){
+      var elapsed = Date.now() - c.startedAt;
+      var remaining = c.minutes*60000 - elapsed;
+      var expired = remaining <= 0;
+      if(expired && !notifiedCards[c.id]){
+        notifiedCards[c.id] = true;
+        try{ if(navigator.vibrate) navigator.vibrate([200,100,200]); }catch(e){}
+        playAlarm();
+      }
+      var row = document.createElement("div");
+      row.className = "card-timer-row" + (expired ? " expired" : "");
+      var teamName = c.team === "home" ? state.homeName : state.awayName;
+      var timeText = expired ? "0:00" : fmt(remaining);
+      var cardLabel = c.type === "green" ? "Grüne Karte" : "Gelbe Karte";
+      row.innerHTML =
+        '<div class="card-timer-time' + (expired ? " expired" : "") + '">' + timeText + '</div>' +
+        '<div class="card-timer-dot ' + (c.type||"yellow") + '"></div>' +
+        '<div class="card-timer-text">' + cardLabel + ' — ' + teamName + '</div>';
+      var rm = document.createElement("button");
+      rm.className = "card-timer-remove";
+      rm.textContent = "Entfernen";
+      rm.addEventListener("click", function(){ removeCard(c.id); });
+      row.appendChild(rm);
+      activeCardsEl.appendChild(row);
+    });
+    renderPlayersOnField();
+  }
+
+  function ensureCardTicking(){
+    if(state.cards.length > 0 && !cardTickHandle) cardTickHandle = setInterval(renderCards, 1000);
+    else if(state.cards.length === 0 && cardTickHandle){ clearInterval(cardTickHandle); cardTickHandle = null; }
+  }
+
+  document.getElementById("homeCardFixed").addEventListener("click", function(){ unlockAudio(); addCard("home", 2, "green"); });
+  document.getElementById("awayCardFixed").addEventListener("click", function(){ unlockAudio(); addCard("away", 2, "green"); });
+
+  function addRedCard(team){
+    addEvent({ type:"card", team: team, cardType:"red", duration:null, minute: matchMinute(), phaseLabel: currentPhase().label });
+  }
+  document.getElementById("homeCardRed").addEventListener("click", function(){ addRedCard("home"); });
+  document.getElementById("awayCardRed").addEventListener("click", function(){ addRedCard("away"); });
+
+  function openCardOverlay(team){
+    unlockAudio();
+    pendingCardTeam = team;
+    var name = team === "home" ? state.homeName : state.awayName;
+    cardSheetTitle.textContent = "Gelbe Karte für " + name;
+    cardOverlay.classList.remove("hidden");
+  }
+  function closeCardOverlay(){
+    cardOverlay.classList.add("hidden");
+    pendingCardTeam = null;
+  }
+  document.getElementById("homeCardVar").addEventListener("click", function(){ openCardOverlay("home"); });
+  document.getElementById("awayCardVar").addEventListener("click", function(){ openCardOverlay("away"); });
+  document.getElementById("cardSheetCancel").addEventListener("click", closeCardOverlay);
+  cardOverlay.addEventListener("click", function(e){ if(e.target === cardOverlay) closeCardOverlay(); });
+
+  for(var m = 5; m <= 10; m++){
+    (function(minutes){
+      var btn = document.createElement("button");
+      btn.textContent = minutes + " Min.";
+      btn.addEventListener("click", function(){
+        if(pendingCardTeam){ addCard(pendingCardTeam, minutes, "yellow"); }
+        closeCardOverlay();
+      });
+      durationGrid.appendChild(btn);
+    })(m);
+  }
+
+  function stopClockForCorner(){
+    if(state.running){
+      state.elapsedMs = currentElapsedMs(); state.running = false; state.startedAt = null;
+      renderToggle(); ensureTicking(); renderClock(); save();
+    }
+  }
+
+  // Kurze Ecke & 7 Meter: tippen stoppt sofort die Uhr und trägt den Vorgang ein.
+  // Ob es ein Tor war, entscheidest du später im Spielbogen (per "Tor eintragen"),
+  // auch wenn die Uhr inzwischen schon wieder läuft.
+  function logStoppedEvent(type, team){
+    stopClockForCorner();
+    addEvent({ type: type, team: team, minute: matchMinute(), phaseLabel: currentPhase().label });
+  }
+  document.getElementById("homeCorner").addEventListener("click", function(){ logStoppedEvent("corner", "home"); });
+  document.getElementById("awayCorner").addEventListener("click", function(){ logStoppedEvent("corner", "away"); });
+  document.getElementById("home7m").addEventListener("click", function(){ logStoppedEvent("penalty7m", "home"); });
+  document.getElementById("away7m").addEventListener("click", function(){ logStoppedEvent("penalty7m", "away"); });
+  document.getElementById("homeTimeout").addEventListener("click", function(){ logStoppedEvent("timeout", "home"); });
+  document.getElementById("awayTimeout").addEventListener("click", function(){ logStoppedEvent("timeout", "away"); });
+
+  // Spielende
+  document.getElementById("endMatch").addEventListener("click", function(){
+    if(state.running){
+      state.elapsedMs = currentElapsedMs(); state.running = false; state.startedAt = null;
+      renderToggle(); ensureTicking(); renderClock();
+    }
+    var homeGoals = state.events.filter(function(e){ return e.type==="goal" && e.team==="home"; }).length;
+    var awayGoals = state.events.filter(function(e){ return e.type==="goal" && e.team==="away"; }).length;
+    addEvent({
+      type:"milestone",
+      label:"Spielende – Endstand " + state.homeName + " " + homeGoals + ":" + awayGoals + " " + state.awayName,
+      minute: matchMinute(),
+      phaseLabel: currentPhase().label
+    });
+    save();
+  });
+
+  // Minute nachträglich korrigieren
+  var minuteOverlay = document.getElementById("minuteOverlay");
+  var minuteSub = document.getElementById("minuteSub");
+  var minuteInput = document.getElementById("minuteInput");
+  var pendingMinuteId = null;
+
+  function openMinuteOverlay(id){
+    var ev = state.events.filter(function(e){ return e.id === id; })[0];
+    if(!ev) return;
+    pendingMinuteId = id;
+    minuteSub.textContent = eventText(ev);
+    minuteInput.value = ev.minute;
+    minuteOverlay.classList.remove("hidden");
+    setTimeout(function(){ minuteInput.focus(); minuteInput.select(); }, 50);
+  }
+  function closeMinuteOverlay(){
+    minuteOverlay.classList.add("hidden");
+    pendingMinuteId = null;
+  }
+  function confirmMinute(){
+    if(!pendingMinuteId) return;
+    var val = parseInt(minuteInput.value, 10);
+    if(!isNaN(val) && val > 0){
+      var ev = state.events.filter(function(e){ return e.id === pendingMinuteId; })[0];
+      if(ev){ ev.minute = val; save(); renderEvents(); }
+    }
+    closeMinuteOverlay();
+  }
+  document.getElementById("minuteCancel").addEventListener("click", closeMinuteOverlay);
+  document.getElementById("minuteConfirm").addEventListener("click", confirmMinute);
+  minuteInput.addEventListener("keydown", function(e){ if(e.key === "Enter") confirmMinute(); });
+  minuteOverlay.addEventListener("click", function(e){ if(e.target === minuteOverlay) closeMinuteOverlay(); });
+
+  var confirmOverlay = document.getElementById("confirmOverlay");
+  document.getElementById("resetMatch").addEventListener("click", function(){
+    confirmOverlay.classList.remove("hidden");
+  });
+  document.getElementById("confirmCancel").addEventListener("click", function(){
+    confirmOverlay.classList.add("hidden");
+  });
+  confirmOverlay.addEventListener("click", function(e){
+    if(e.target === confirmOverlay) confirmOverlay.classList.add("hidden");
+  });
+  document.getElementById("confirmOk").addEventListener("click", function(){
+    confirmOverlay.classList.add("hidden");
+    if(tickHandle){ clearInterval(tickHandle); tickHandle = null; }
+    if(cardTickHandle){ clearInterval(cardTickHandle); cardTickHandle = null; }
+    state = {
+      homeName:"Heim", awayName:"Gast",
+      homeClub:"", awayClub:"",
+      events:[], seq:0, started:false, cards:[], running:false, elapsedMs:0, startedAt:null, phaseIndex:0
+    };
+    notifiedCards = {};
+    homeNameInput.value = state.homeName; awayNameInput.value = state.awayName;
+    homeClubInput.value = ""; awayClubInput.value = "";
+    homeZoneLabel.textContent = "Tor " + state.homeName;
+    awayZoneLabel.textContent = "Tor " + state.awayName;
+    renderPhase(); renderToggle(); ensureTicking(); renderClock(); renderEvents();
+    renderCards(); ensureCardTicking(); save();
+  });
+
+  // init
+  load();
+  if(!state.cards) state.cards = [];
+  if(!state.events) state.events = [];
+  if(!state.seq) state.seq = state.events.length;
+  homeNameInput.value = state.homeName; awayNameInput.value = state.awayName;
+  homeClubInput.value = state.homeClub || ""; awayClubInput.value = state.awayClub || "";
+  homeZoneLabel.textContent = "Tor " + state.homeName;
+  awayZoneLabel.textContent = "Tor " + state.awayName;
+  renderPhase(); renderToggle(); renderClock(); ensureTicking(); renderEvents();
+  renderCards(); ensureCardTicking();
+})();
+</script>
+</body>
+</html>
